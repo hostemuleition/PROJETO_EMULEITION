@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Host Emuleition | Duo Adventure 20 Fases</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        #menu-container {
+            max-width: 800px;
+            margin: 20px auto;
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 10px;
+            padding: 10px;
+            background: #0a0e1a;
+            border-radius: 10px;
+            border: 1px solid #1f2937;
+        }
+        .btn-fase {
+            aspect-ratio: 1;
+            background: #111;
+            color: #444;
+            border: 2px solid #222;
+            cursor: not-allowed;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+        }
+        .btn-fase.unlocked {
+            color: #fff;
+            border-color: #007bff;
+            cursor: pointer;
+        }
+        .btn-fase.unlocked:hover { background: #007bff; box-shadow: 0 0 10px #007bff; }
+        .btn-fase.active { background: #00d4ff; color: #000; border-color: #fff; }
+        
+        canvas { display: block; margin: 0 auto; background: #000; border: 2px solid #333; }
+        .instrucoes { color: #888; font-size: 14px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">HOST <span>EMULEITION</span></div>
+            <ul>
+                <li><a href="index.html">Início</a></li>
+                <li><a href="game.html">Solo</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main style="text-align: center; padding: 20px;">
+        <h2>Duo Adventure: 20 Níveis</h2>
+        <p class="instrucoes">P1: Setas | P2: WASD. Cheguem juntos às portas para desbloquear a próxima fase.</p>
+        
+        <div id="menu-container"></div>
+
+        <canvas id="coop-canvas" width="800" height="400"></canvas>
+        
+        <div id="status" style="font-size: 22px; color: #00d4ff; margin: 15px; min-height: 30px;">Selecione a Fase 1</div>
+        
+        <div style="display: flex; justify-content: center; gap: 20px;">
+            <button class="btn" onclick="reiniciarFase()">Reiniciar Fase</button>
+            <button class="btn" onclick="limparProgresso()" style="background: #ff5555;">Resetar Tudo</button>
+        </div>
+    </main>
+
+    <script src="coop.js"></script>
+</body>
+</html>
