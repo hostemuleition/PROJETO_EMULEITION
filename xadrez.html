@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Xadrez com Promoção</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #2e2e2e;
+    color: white;
+    min-height: 100vh;
+    margin: 0;
+}
+h1 { margin-bottom: 10px; }
+#status { margin-bottom: 10px; font-size: 18px; }
+#board {
+    display: grid;
+    grid-template-columns: repeat(8, 60px);
+    grid-template-rows: repeat(8, 60px);
+    gap: 0;
+    position: relative;
+}
+.square {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    cursor: pointer;
+    user-select: none;
+}
+.square.light { background-color: #f0d9b5; }
+.square.dark { background-color: #b58863; }
+.square.selected { outline: 3px solid yellow; }
+.square.valid-move { outline: 3px solid green; }
+.piece-white { color: white; text-shadow: 0 0 2px black; }
+.piece-black { color: black; }
+#promotionMenu {
+    position: absolute;
+    display: none;
+    background: #333;
+    border: 2px solid yellow;
+    border-radius: 8px;
+    padding: 5px;
+    display: flex;
+    z-index: 10;
+}
+.promoBtn {
+    font-size: 36px;
+    width: 50px;
+    height: 50px;
+    margin: 2px;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid #fff;
+    border-radius: 6px;
+}
+.promoBtn:hover { background: #555; }
+</style>
+</head>
+<body>
+
+<h1>Xadrez com Promoção de Peão</h1>
+<div id="status">Vez: Branco</div>
+<div id="board"></div>
+<div id="promotionMenu"></div>
+<button onclick="resetGame()">Reiniciar</button>
+
+<script>
+const boardElement = document.getElementById("board");
+const status = document.getElementById("status");
+const promotionMenu = document.getElementById("promotionMenu");
+
+let board = [];
+let selectedSquare = null;
+let validMoves = [];
+let currentPlayer = "white";
+
+const pieces = {
+    white: { pawn: "♙", rook: "♖", knight:"♘", bishop:"♗", queen:"♕", king:"♔" },
+    black: { pawn: "♟", rook: "♜", knight:"♞", bishop:"♝", queen:"♛", king:"♚" }
+};
+
+function initBoard(){
+    board = Array(8).fill(null).map(()=>Array(8).fill(null));
+    const backRank = ["rook","knight","bishop","queen","king","bishop","knight","rook"];
+    for(let i=0;i<8;i++){
+        board[1][i]={type:"pawn",color:"black"};
+        board[6][i]={type:"pawn",color:"white"};
+        board[0][i]={type:backRank[i], color:"black"};
+        board[7][i]={type:backRank[i], color:"white"};
+    }
+}
+
+function renderBoard(){
+    boardElement.innerHTML="";
+    for(let row=0;row<8;row++){
+        for(let col=0;col<8;col++){
+            const square=document.createElement("div");
+            square.classList.add("square",(row+col)%2===0?"light":"dark");
+            const piece = board[row][col];
+            if(piece){
+                square.textContent = pieces[piece.color][piece.type];
+                square.classList.add(piece.color==="white"?"piece-white":"piece-black");
+            }
+            square.dataset.row=row;
+            square.dataset.col=col;
+            if(selectedSquare && selectedSquare.row===row && selectedSquare.col===col) square.classList.add("selected");
+            if(validMoves.some(m=>m.row===row && m.col===col)) square.classList.add("valid-move");
+            square.addEventListener("click",()=>handleClick(row,col));
+            boardElement.appendChild(square);
+        }
+    }
+}
+
+function handleClick(row,col){
+    const piece = board[row][col];
+    if(selectedSquare){
+        if(validMoves.some(m=>m.row===row && m.col===col)){
+            movePiece(selectedSquare,row,col);
+            selectedSquare=null;
+            validMoves=[];
+            // Checa promoção
+            const movedPiece = board[row][col];
+            if(movedPiece.type==="pawn" && ((movedPiece.color==="white" && row===0) || (movedPiece.color==="black" && row===7))){
+                showPromotionMenu(row,col);
+                renderBoard();
+                return;
+            }
+            currentPlayer=currentPlayer==="white"?"black":"white";
+            status.textContent=`Vez: ${currentPlayer==="white"?"Branco":"Preto"}`;
+            renderBoard();
+            checkCheck();
+            return;
+        } else if(piece && piece.color===currentPlayer){
+            selectedSquare={row,col};
+            validMoves=getValidMoves(row,col);
+            renderBoard();
+            return;
+        } else {
+            selectedSquare=null;
+            validMoves=[];
+            renderBoard();
+            return;
+        }
+    } else {
+        if(piece && piece.color===currentPlayer){
+            selectedSquare={row,col};
+            validMoves=getValidMoves(row,col);
+            renderBoard();
+        }
+    }
+}
+
+function movePiece(from,toRow,toCol){
+    board[toRow][toCol]=board[from.row][from.col];
+    board[from.row][from.col]=null;
+}
+
+function getValidMoves(r,c){
+    const piece = board[r][c];
+    if(!piece) return [];
+    const moves=[];
+    const dir = piece.color==="white"? -1:1;
+    switch(piece.type){
+        case "pawn":
+            if(isEmpty(r+dir,c)) moves.push({row:r+dir,col:c});
+            if((r===6 && piece.color==="white") || (r===1 && piece.color==="black"))
+                if(isEmpty(r+2*dir,c)) moves.push({row:r+2*dir,col:c});
+            if(isEnemy(r+dir,c+1,piece.color)) moves.push({row:r+dir,col:c+1});
+            if(isEnemy(r+dir,c-1,piece.color)) moves.push({row:r+dir,col:c-1});
+            break;
+        case "rook": addLinearMoves(moves,r,c,piece.color,[[1,0],[-1,0],[0,1],[0,-1]]); break;
+        case "bishop": addLinearMoves(moves,r,c,piece.color,[[1,1],[1,-1],[-1,1],[-1,-1]]); break;
+        case "queen": addLinearMoves(moves,r,c,piece.color,[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]); break;
+        case "king":
+            for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+                if(dr===0 && dc===0) continue;
+                if(isValidSquare(r+dr,c+dc) && !isAlly(r+dr,c+dc,piece.color)) moves.push({row:r+dr,col:c+dc});
+            }
+            break;
+        case "knight":
+            const jumps=[[2,1],[1,2],[-1,2],[-2,1],[-2,-1],[-1,-2],[1,-2],[2,-1]];
+            jumps.forEach(([dr,dc])=>{if(isValidSquare(r+dr,c+dc)&&!isAlly(r+dr,c+dc,piece.color)) moves.push({row:r+dr,col:c+dc});});
+            break;
+    }
+    return moves;
+}
+
+function addLinearMoves(moves,r,c,color,directions){
+    directions.forEach(([dr,dc])=>{
+        let nr=r+dr,nc=c+dc;
+        while(isValidSquare(nr,nc)){
+            if(board[nr][nc]==null) moves.push({row:nr,col:nc});
+            else if(board[nr][nc].color!==color){ moves.push({row:nr,col:nc}); break; }
+            else break;
+            nr+=dr; nc+=dc;
+        }
+    });
+}
+
+function isValidSquare(r,c){return r>=0 && r<8 && c>=0 && c<8;}
+function isEmpty(r,c){return isValidSquare(r,c) && !board[r][c];}
+function isEnemy(r,c,color){return isValidSquare(r,c) && board[r][c] && board[r][c].color!==color;}
+function isAlly(r,c,color){return isValidSquare(r,c) && board[r][c] && board[r][c].color===color;}
+
+function checkCheck(){
+    const whiteKing = findKing("white");
+    const blackKing = findKing("black");
+    if(isAttacked(whiteKing.row,whiteKing.col,"black")) alert("Rei Branco em xeque!");
+    if(isAttacked(blackKing.row,blackKing.col,"white")) alert("Rei Preto em xeque!");
+}
+
+function findKing(color){
+    for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+        if(board[r][c] && board[r][c].type==="king" && board[r][c].color===color) return {row:r,col:c};
+    }
+}
+
+function isAttacked(r,c,byColor){
+    for(let i=0;i<8;i++) for(let j=0;j<8;j++){
+        const piece=board[i][j];
+        if(piece && piece.color===byColor){
+            const moves=getValidMoves(i,j);
+            if(moves.some(m=>m.row===r && m.col===c)) return true;
+        }
+    }
+    return false;
+}
+
+// Promoção do peão com menu visual
+function showPromotionMenu(row,col){
+    promotionMenu.innerHTML="";
+    const pieceChoices = ["queen","rook","bishop","knight"];
+    pieceChoices.forEach(type=>{
+        const btn = document.createElement("button");
+        btn.classList.add("promoBtn");
+        btn.textContent = pieces[board[row][col].color][type];
+        btn.addEventListener("click", ()=>{
+            board[row][col].type=type;
+            promotionMenu.style.display="none";
+            currentPlayer=currentPlayer==="white"?"black":"white";
+            status.textContent=`Vez: ${currentPlayer==="white"?"Branco":"Preto"}`;
+            renderBoard();
+            checkCheck();
+        });
+        promotionMenu.appendChild(btn);
+    });
+    const squareSize=60;
+    promotionMenu.style.top=`${row*squareSize}px`;
+    promotionMenu.style.left=`${col*squareSize}px`;
+    promotionMenu.style.display="flex";
+}
+
+function resetGame(){
+    currentPlayer="white";
+    status.textContent="Vez: Branco";
+    selectedSquare=null;
+    validMoves=[];
+    promotionMenu.style.display="none";
+    initBoard();
+    renderBoard();
+}
+
+initBoard();
+renderBoard();
+</script>
+
+</body>
+</html>

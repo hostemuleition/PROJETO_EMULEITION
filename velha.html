@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jogo da velha 8000</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #141e30, #243b55);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; margin: 0; color: white;
+}
+h1 { margin-bottom: 5px; }
+.status { margin: 10px; font-size: 18px; text-align: center; }
+.board { display: grid; grid-template-columns: repeat(3, 100px); gap: 5px; margin: 15px 0; }
+.cell { background: white; color: #333; font-size: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; height: 100px; border-radius: 8px; }
+.cell.protected { background: #00c853 !important; color: white; }
+.cell.winner { background: #ff1744 !important; color: white; }
+button { padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; margin: 5px; }
+</style>
+</head>
+<body>
+
+<h1>🎮 Jogo da Velha 8000</h1>
+<div class="status" id="status">Vez: X | Power-up: Nenhum</div>
+<div class="board" id="board"></div>
+<div class="power-container">
+    <button onclick="usePower()">Usar Power-up</button>
+</div>
+<button onclick="restartGame()">Reiniciar</button>
+
+<script>
+const board = document.getElementById("board");
+const statusText = document.getElementById("status");
+
+let currentPlayer = "X";
+let cells = [];
+let gameActive = true;
+let powers = { X:null, O:null };
+let selectedPower = null;
+let extraTurnActive = false;
+let turnCount = 0;
+
+const powerList = ["erase","extra","shield","swap","transform"]; // NOVO POWER-UP
+
+function createBoard(){
+    board.innerHTML="";
+    cells=[];
+    for(let i=0;i<9;i++){
+        const cell=document.createElement("div");
+        cell.classList.add("cell");
+        cell.dataset.protected="false";
+        cell.dataset.shieldTurns="0";
+        cell.addEventListener("click",()=>handleClick(i));
+        board.appendChild(cell);
+        cells.push(cell);
+    }
+}
+
+function handleClick(index){
+    if(!gameActive) return;
+    const cell = cells[index];
+
+    // POWER: ERASE
+    if(selectedPower==="erase"){
+        if(cell.textContent!=="" && cell.textContent!==currentPlayer && cell.dataset.protected==="false"){
+            cell.textContent="";
+            powers[currentPlayer]=null;
+            selectedPower=null;
+            nextTurn();
+        }
+        return;
+    }
+
+    // POWER: SHIELD
+    if(selectedPower==="shield"){
+        if(cell.textContent==="" && cell.dataset.protected==="false"){
+            cell.dataset.protected="true";
+            cell.dataset.shieldTurns="2";
+            cell.classList.add("protected");
+            powers[currentPlayer]=null;
+            selectedPower=null;
+            nextTurn();
+        }
+        return;
+    }
+
+    // POWER: TRANSFORMAR
+    if(selectedPower==="transform"){
+        if(cell.textContent!=="" && cell.textContent!==currentPlayer && cell.dataset.protected==="false"){
+            cell.textContent = currentPlayer; // transforma a peça do adversário
+            powers[currentPlayer]=null;
+            selectedPower=null;
+            nextTurn();
+        }
+        return;
+    }
+
+    // CASA PROTEGIDA
+    if(cell.dataset.protected==="true") return;
+
+    // CASA OCUPADA
+    if(cell.textContent!=="") return;
+
+    // JOGADA NORMAL
+    cell.textContent=currentPlayer;
+    turnCount++;
+
+    // DAR POWERUP A CADA 2 RODADAS
+    if(turnCount%4===0) giveBothPlayersPower();
+
+    if(checkWinner()) return;
+
+    if(extraTurnActive){ extraTurnActive=false; }
+    else { currentPlayer=currentPlayer==="X"?"O":"X"; }
+
+    decreaseShieldTurns();
+    updateStatus();
+}
+
+function decreaseShieldTurns(){
+    cells.forEach(cell=>{
+        if(cell.dataset.protected==="true"){
+            let turns=parseInt(cell.dataset.shieldTurns);
+            turns--;
+            if(turns<=0){
+                cell.dataset.protected="false";
+                cell.dataset.shieldTurns="0";
+                cell.classList.remove("protected");
+            } else { cell.dataset.shieldTurns=turns.toString(); }
+        }
+    });
+}
+
+function giveBothPlayersPower(){
+    powers.X = powerList[Math.floor(Math.random()*powerList.length)];
+    powers.O = powerList[Math.floor(Math.random()*powerList.length)];
+    updateStatus();
+}
+
+function usePower(){
+    if(!powers[currentPlayer]) return;
+    selectedPower = powers[currentPlayer];
+
+    if(selectedPower==="extra"){
+        extraTurnActive=true;
+        powers[currentPlayer]=null;
+        selectedPower=null;
+        statusText.textContent=`🎯 ${currentPlayer} ganhou jogada extra!`;
+        return;
+    }
+
+    if(selectedPower==="swap"){
+        cells.forEach(cell=>{
+            if(cell.dataset.protected==="true") return;
+            if(cell.textContent==="X") cell.textContent="O";
+            else if(cell.textContent==="O") cell.textContent="X";
+        });
+        powers[currentPlayer]=null;
+        selectedPower=null;
+        updateStatus();
+        return;
+    }
+
+    statusText.textContent="Clique em uma casa válida para usar o poder!";
+}
+
+function nextTurn(){
+    if(checkWinner()) return;
+    turnCount++;
+    if(turnCount%4===0) giveBothPlayersPower();
+    currentPlayer=currentPlayer==="X"?"O":"X";
+    decreaseShieldTurns();
+    updateStatus();
+}
+
+function checkWinner(){
+    const combos=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    for(let c of combos){
+        const [a,b,c1]=c;
+        if(cells[a].textContent && cells[a].textContent===cells[b].textContent && cells[a].textContent===cells[c1].textContent){
+            cells[a].classList.add("winner");
+            cells[b].classList.add("winner");
+            cells[c1].classList.add("winner");
+            statusText.textContent=`🔥 ${cells[a].textContent} venceu!`;
+            gameActive=false; return true;
+        }
+    }
+    return false;
+}
+
+function restartGame(){
+    currentPlayer="X";
+    gameActive=true;
+    turnCount=0;
+    powers={X:null,O:null};
+    selectedPower=null;
+    extraTurnActive=false;
+    createBoard();
+    updateStatus();
+}
+
+function updateStatus(){
+    statusText.textContent=`Vez: ${currentPlayer} | Power-up: ${powers[currentPlayer]||"Nenhum"}`;
+}
+
+createBoard();
+updateStatus();
+</script>
+
+</body>
+</html>
