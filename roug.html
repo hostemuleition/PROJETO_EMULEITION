@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Neon Rogue | Host Emuleition</title>
+    <style>
+        body { margin: 0; background: #050505; color: #00ffcc; font-family: 'Courier New', monospace; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        #ui { padding: 10px; font-size: 18px; width: 800px; display: flex; justify-content: space-between; background: rgba(0,255,204,0.1); margin-top: 10px; }
+        canvas { border: 2px solid #00ffcc; background: #000; cursor: crosshair; display: block; box-shadow: 0 0 15px #00ffcc; }
+        
+        /* Telas de Upgrade */
+        #lvl-up-screen { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95); border: 3px solid #ff0055; padding: 25px;
+            display: none; text-align: center; z-index: 10; box-shadow: 0 0 30px #ff0055;
+        }
+        .upgrade-btn { 
+            display: block; width: 280px; margin: 10px auto; padding: 12px;
+            background: #00ffcc; border: none; cursor: pointer; font-weight: bold; font-family: inherit; color: #000;
+        }
+        .upgrade-btn:hover { background: #ff0055; color: white; }
+
+        /* HUD do Chefe */
+        #boss-ui { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); width: 500px; display: none; text-align: center; }
+        #boss-hp-bg { width: 100%; height: 15px; border: 2px solid #ff0055; background: #111; }
+        #boss-hp-bar { width: 100%; height: 100%; background: #ff0055; box-shadow: 0 0 10px #ff0055; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div>HP: <span id="hp">100</span></div>
+        <div>LVL: <span id="lvl">1</span></div>
+        <div>XP: <span id="xp">0</span></div>
+    </div>
+
+    <div id="boss-ui">
+        <div id="boss-name" style="color:#ff0055; margin-bottom:5px; font-weight: bold;">BOSS</div>
+        <div id="boss-hp-bg"><div id="boss-hp-bar"></div></div>
+    </div>
+
+    <div id="lvl-up-screen">
+        <h2 id="screen-title" style="color: #ff0055;">LEVEL UP!</h2>
+        <div id="upgrade-list"></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        // Tudo em um arquivo para garantir que funcione!
+        window.onload = () => {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 800;
+            canvas.height = 600;
+
+            let isPaused = false;
+            let currentBoss = null;
+            let enemies = [];
+            let bullets = [];
+            const keys = {};
+
+            const player = {
+                x: 400, y: 300, size: 15, speed: 3.5,
+                hp: 100, maxHp: 100, xp: 0, nextLvl: 50, lvl: 1,
+                fireRate: 400, lastFire: 0, damage: 1, bulletsNum: 1, orbitals: 0
+            };
+
+            const bosses = [
+                { name: "CYBER-CRUSHER", color: "#ff8800", hp: 100 },
+                { name: "NEON-WITCH", color: "#bf00ff", hp: 200 },
+                { name: "VOID-STALKER", color: "#ffffff", hp: 350 }
+            ];
+
+            window.onkeydown = e => keys[e.code] = true;
+            window.onkeyup = e => keys[e.code] = false;
+
+            canvas.onmousedown = e => {
+                if(isPaused) return;
+                const now = Date.now();
+                if(now - player.lastFire > player.fireRate) {
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+                    const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+                    
+                    for(let i=0; i < player.bulletsNum; i++) {
+                        let spread = (i - Math.floor(player.bulletsNum/2)) * 0.2;
+                        bullets.push({ x: player.x, y: player.y, vx: Math.cos(angle+spread)*7, vy: Math.sin(angle+spread)*7 });
+                    }
+                    player.lastFire = now;
+                }
+            };
+
+            function showUpgradeScreen(isEpic = false) {
+                isPaused = true;
+                const screen = document.getElementById('lvl-up-screen');
+                const list = document.getElementById('upgrade-list');
+                document.getElementById('screen-title').innerText = isEpic ? "ITEM ÉPICO!" : "LEVEL UP!";
+                screen.style.display = 'block';
+                list.innerHTML = '';
+
+                const options = isEpic ? [
+                    { name: "NÚCLEO DE FURY", d: "Dano +3", f: () => player.damage += 3 },
+                    { name: "ESCUDO ORBITAL", d: "Esfera de Defesa", f: () => player.orbitals += 1 },
+                    { name: "HIPER-DRIVE", d: "Tiro muito rápido", f: () => player.fireRate *= 0.5 }
+                ] : [
+                    { name: "Dano +1", d: "Mais poder", f: () => player.damage += 1 },
+                    { name: "Velocidade +0.5", d: "Corre mais", f: () => player.speed += 0.5 },
+                    { name: "Recarga -15%", d: "Atira rápido", f: () => player.fireRate *= 0.85 },
+                    { name: "Vida Máxima", d: "HP +20", f: () => { player.maxHp += 20; player.hp = player.maxHp; } }
+                ];
+
+                options.sort(() => 0.5 - Math.random()).slice(0, 3).forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.className = 'upgrade-btn';
+                    btn.innerHTML = `<b>${opt.name}</b><br><small>${opt.d}</small>`;
+                    btn.onclick = () => { opt.f(); isPaused = false; screen.style.display = 'none'; };
+                    list.appendChild(btn);
+                });
+            }
+
+            function update() {
+                if(isPaused) return;
+
+                if (keys['KeyW'] && player.y > 0) player.y -= player.speed;
+                if (keys['KeyS'] && player.y < canvas.height) player.y += player.speed;
+                if (keys['KeyA'] && player.x > 0) player.x -= player.speed;
+                if (keys['KeyD'] && player.x < canvas.width) player.x += player.speed;
+
+                bullets.forEach((b, i) => {
+                    b.x += b.vx; b.y += b.vy;
+                    if(b.x<0 || b.x>canvas.width || b.y<0 || b.y>canvas.height) bullets.splice(i, 1);
+                });
+
+                enemies.forEach((en, ei) => {
+                    const dist = Math.hypot(player.x-en.x, player.y-en.y);
+                    en.x += ((player.x - en.x) / dist) * en.speed;
+                    en.y += ((player.y - en.y) / dist) * en.speed;
+                    if(dist < 20) player.hp -= 0.4;
+
+                    bullets.forEach((b, bi) => {
+                        if(Math.hypot(b.x-en.x, b.y-en.y) < 20) {
+                            en.hp -= player.damage;
+                            bullets.splice(bi, 1);
+                            if(en.hp <= 0) {
+                                enemies.splice(ei, 1);
+                                player.xp += 15;
+                                if(player.xp >= player.nextLvl) {
+                                    player.lvl++; player.xp = 0; player.nextLvl += 50;
+                                    showUpgradeScreen(false);
+                                    if(player.lvl % 5 === 0) {
+                                        const bData = bosses[Math.min(Math.floor(player.lvl/5)-1, bosses.length-1)];
+                                        currentBoss = { ...bData, x: 400, y: -50, maxHp: bData.hp, angle: 0 };
+                                        document.getElementById('boss-ui').style.display = 'block';
+                                        document.getElementById('boss-name').innerText = currentBoss.name;
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+
+                if(currentBoss) {
+                    currentBoss.y = Math.min(currentBoss.y + 1, 150);
+                    currentBoss.angle += 0.02;
+                    currentBoss.x += Math.sin(currentBoss.angle) * 2;
+                    bullets.forEach((b, bi) => {
+                        if(Math.hypot(b.x-currentBoss.x, b.y-currentBoss.y) < 40) {
+                            currentBoss.hp -= player.damage; bullets.splice(bi, 1);
+                            document.getElementById('boss-hp-bar').style.width = (currentBoss.hp/currentBoss.maxHp)*100 + "%";
+                            if(currentBoss.hp <= 0) { 
+                                currentBoss = null; document.getElementById('boss-ui').style.display = 'none';
+                                showUpgradeScreen(true);
+                            }
+                        }
+                    });
+                }
+
+                if(player.hp <= 0) {
+                    alert("GAME OVER! Nível alcançado: " + player.lvl);
+                    location.reload();
+                }
+                
+                document.getElementById('hp').innerText = Math.floor(player.hp);
+                document.getElementById('xp').innerText = player.xp;
+                document.getElementById('lvl').innerText = player.lvl;
+            }
+
+            function draw() {
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Jogador
+                ctx.fillStyle = '#00ffcc';
+                ctx.beginPath(); ctx.arc(player.x, player.y, player.size, 0, Math.PI*2); ctx.fill();
+
+                // Orbitais
+                for(let i=0; i<player.orbitals; i++) {
+                    let ang = (Date.now()/500) + (i * Math.PI*2/player.orbitals);
+                    ctx.fillStyle = '#ff0055';
+                    ctx.beginPath(); ctx.arc(player.x + Math.cos(ang)*40, player.y + Math.sin(ang)*40, 5, 0, Math.PI*2); ctx.fill();
+                }
+
+                // Boss
+                if(currentBoss) {
+                    ctx.fillStyle = currentBoss.color;
+                    ctx.shadowBlur = 20; ctx.shadowColor = currentBoss.color;
+                    ctx.fillRect(currentBoss.x-30, currentBoss.y-30, 60, 60);
+                    ctx.shadowBlur = 0;
+                }
+
+                // Inimigos e Balas
+                ctx.fillStyle = '#ff0055';
+                enemies.forEach(en => { ctx.beginPath(); ctx.arc(en.x, en.y, 10, 0, Math.PI*2); ctx.fill(); });
+                ctx.fillStyle = 'white';
+                bullets.forEach(b => ctx.fillRect(b.x, b.y, 4, 4));
+            }
+
+            function gameLoop() {
+                update();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+
+            // Gerar inimigos
+            setInterval(() => { 
+                if(!isPaused && !currentBoss) {
+                    enemies.push({x: Math.random()*800, y: -20, hp: 1+player.lvl*0.5, speed: 1.5 + (player.lvl*0.1)}); 
+                }
+            }, 1200);
+
+            gameLoop();
+        };
+    </script>
+</body>
+</html>

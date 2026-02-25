@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Damas Master | Host Emuleition</title>
+    <style>
+        body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; }
+        #game-container { display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
+        #tabuleiro {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            border: 5px solid #333;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .casa { width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; }
+        .preta { background-color: #769656; }
+        .branca { background-color: #eeeed2; }
+        
+        .peca {
+            width: 45px; height: 45px; border-radius: 50%;
+            cursor: pointer; transition: 0.2s;
+            box-sizing: border-box;
+        }
+        .peca.vermelha { background: #d32f2f; border: 3px solid #b71c1c; }
+        .peca.preta-peca { background: #333; border: 3px solid #000; }
+        .peca.dama { border: 5px double gold; }
+        .selecionada { outline: 4px solid yellow; transform: scale(1.1); }
+        
+        #status { margin: 20px; font-size: 24px; font-weight: bold; color: #00d4ff; }
+        .btn-reset { padding: 10px 20px; cursor: pointer; background: #00d4ff; border: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>DAMAS MASTER</h1>
+    <div id="status">Vez das Vermelhas</div>
+    
+    <div id="game-container">
+        <div id="tabuleiro"></div>
+        <br>
+        <button class="btn-reset" onclick="resetarJogo()">Reiniciar Jogo</button>
+    </div>
+
+    
+</body>
+<script src="./SCRIPTS/damas.js"></script>
+</html>
